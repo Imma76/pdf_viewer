@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "457556355502",
+    "project_id": "pdfviewer-860ee",
+    "storage_bucket": "pdfviewer-860ee.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:457556355502:android:9d4ef6702e2684f6ad803f",
+        "android_client_info": {
+          "package_name": "com.emmacoder.pdf_viewer"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "457556355502-51s4eun8fiq79voa2hk9g51cnd8bgnvr.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACsQ3Y_teqVgBpgwU_D5P07iS8pd32Ucw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "457556355502-51s4eun8fiq79voa2hk9g51cnd8bgnvr.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
