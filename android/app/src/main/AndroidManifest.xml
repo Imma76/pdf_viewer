@@ -1,8 +1,37 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.emmacoder.pdf_viewer">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
    <application
         android:label="pdf_viewer"
         android:icon="@mipmap/ic_launcher">
+        <provider
+    android:name="vn.hunghd.flutterdownloader.DownloadedFileProvider"
+    android:authorities="${applicationId}.flutter_downloader.provider"
+    android:exported="false"
+    android:grantUriPermissions="true">
+    <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@xml/provider_paths"/>
+</provider>
+ <provider
+     android:name="androidx.work.impl.WorkManagerInitializer"
+     android:authorities="${applicationId}.workmanager-init"
+      android:enabled="false"
+     android:exported="false"/>
+
+ <provider
+     android:name="vn.hunghd.flutterdownloader.FlutterDownloaderInitializer"
+     android:authorities="${applicationId}.flutter-downloader-init"
+     android:exported="false">
+     <!-- changes this number to configure the maximum number of concurrent tasks -->
+     <meta-data
+         android:name="vn.hunghd.flutterdownloader.MAX_CONCURRENT_TASKS"
+         android:value="5" />
+ </provider>
+
+
 
         <activity
 
@@ -40,4 +69,5 @@
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+   
 </manifest>

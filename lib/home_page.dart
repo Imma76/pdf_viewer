@@ -1,13 +1,17 @@
 import 'dart:io';
-import 'package:http/http.dart' as http;
+import 'dart:isolate';
+import 'dart:ui';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-
 import 'package:path_provider/path_provider.dart';
+import 'package:pdf_viewer/firebase_file.dart';
 import 'package:pdf_viewer/pdf_viewer.dart';
 import 'package:pdf_viewer/services.dart';
 import 'package:path/path.dart';
+import 'package:flutter_downloader/flutter_downloader.dart';
+import 'package:cool_alert/cool_alert.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -19,18 +23,35 @@ class _HomePageState extends State<HomePage> {
   String fileName;
   Stream streamData;
   File file;
-  GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey();
+
   // var snapshots;
   FirebaseApi _firebaseApi = FirebaseApi();
+  Future<List<FirebaseFile>> futureFiles;
+  double value = 0;
+  ReceivePort _receivePort = ReceivePort();
+  static downloadingCallback(id, status, progress) {
+    SendPort sendPort = IsolateNameServer.lookupPortByName('downloading');
+    sendPort.send({id, status, progress});
+  }
+
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
+    IsolateNameServer.registerPortWithName(
+        _receivePort.sendPort, 'downloading');
     _firebaseApi.getFirebaseUrl().then((result) {
       setState(() {
         streamData = result;
       });
     });
+
+    _receivePort.listen((message) {
+      setState(() {
+        value = message;
+      });
+    });
+    print(value);
+    FlutterDownloader.registerCallback(downloadingCallback);
   }
 
   UploadTask task;
@@ -39,126 +60,145 @@ class _HomePageState extends State<HomePage> {
     final fileName = file != null ? basename(file.path) : "No file Selected";
 
     return Scaffold(
-      appBar: AppBar(),
+      // appBar: AppBar(
+      //   backgroundColor: Colors.transparent,
+      //   elevation: 0.0,
+      // ),
       backgroundColor: Colors.white,
       floatingActionButton: FloatingActionButton(
         child: Icon(Icons.add),
         onPressed: () {
           //getPdf();
+          selectFile(context);
         },
-        backgroundColor: Colors.lightBlueAccent,
+        backgroundColor: Colors.orange,
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            StreamBuilder(
-              stream: streamData,
-              builder: (context, snapshot) {
-                if (snapshot.hasData) {
-                  final pdfFiles = snapshot.data.docs.reversed;
-                  for (var files in pdfFiles) {}
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: snapshot.data.docs.reversed.length,
-                    itemBuilder: (context, index) {
-                      var rev = snapshot.data.docs.reversed.toList();
-                      return Column(
+      body: StreamBuilder(
+        stream: streamData,
+        builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            //  final pdfFiles = snapshot.data.docs.reversed;
+            return ListView.builder(
+              scrollDirection: Axis.vertical,
+              shrinkWrap: true,
+              itemCount: snapshot.data.docs.reversed.length,
+              itemBuilder: (context, index) {
+                var rev = snapshot.data.docs.reversed.toList();
+                return Card(
+                  elevation: 2.0,
+                  shadowColor: Colors.black,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Container(
-                            height: 70.0,
-                            color: Colors.grey,
-                            width: double.infinity,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.delete_rounded),
+                                onPressed: () async {
+                                  var idGet = rev[index].id;
+                                  await _firebaseApi.delete(idGet);
+                                  await _delete(
+                                    rev[index].get('fileName'),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(context,
+                                  MaterialPageRoute(builder: (context) {
+                                return PDFVIEWER(
+                                  fileName: rev[index].get('fileName'),
+                                  link: rev[index].get('downloadUrl'),
+                                );
+                              }));
+                            },
                             child: Center(
-                              child: ListTile(
-                                subtitle: Row(
-                                  children: [
-                                    IconButton(
-                                      icon: Icon(
-                                        Icons.download_rounded,
-                                      ),
-                                      onPressed: () {
-                                        downloadFiles(
-                                            rev[index].get('downloadUrl'));
-                                      },
-                                    ),
-                                    IconButton(
-                                      icon: Icon(
-                                        Icons.remove_red_eye,
-                                      ),
-                                      onPressed: () {
-                                        Navigator.push(context,
-                                            MaterialPageRoute(
-                                                builder: (context) {
-                                          return PDFVIEWER(
-                                            link: rev[index].get('downloadUrl'),
-                                          );
-                                        }));
-                                      },
-                                    ),
-                                  ],
-                                ),
-                                trailing: IconButton(
-                                    icon: Icon(
-                                      Icons.delete,
-                                    ),
-                                    onPressed: () async {
-                                      var idGet = rev[index].id;
-                                      await _firebaseApi.delete(idGet);
-                                      await _delete(
-                                          rev[index].get('downloadUrl'));
-                                      // _firebaseApi.id.removeAt(index);
-                                      //  print(rev[index].id);
-                                    }),
-                                title: Text(rev[index].get('fileName')),
+                              child: Text(
+                                'Click here to view ${rev[index].get('fileName')}',
+                                textAlign: TextAlign.center,
                               ),
                             ),
                           ),
-                          Divider(
-                            height: 1.0,
+                          Center(
+                            child: RaisedButton(
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10.0)),
+                              color: Colors.orange,
+                              //  minWidth: 100.0,
+                              onPressed: () async {
+                                final status =
+                                    await Permission.storage.request();
+                                if (status.isGranted) {
+                                  final externalDir =
+                                      await getExternalStorageDirectory();
+                                  final id = await FlutterDownloader.enqueue(
+                                    url: rev[index].get('downloadUrl'),
+                                    savedDir: externalDir.path,
+                                    fileName: rev[index].get('fileName'),
+                                    showNotification: true,
+                                    openFileFromNotification: true,
+                                  );
+                                } else
+                                  print('permission denied');
+                              },
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Center(
+                                    child: Icon(
+                                      Icons.download_rounded,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  Center(
+                                      child: Text('download file ',
+                                          style:
+                                              TextStyle(color: Colors.white))),
+                                ],
+                              ),
+                            ),
                           ),
-                        ],
-                      );
-                    },
-                  );
-                } else {
-                  return Container();
-                }
+                        ]),
+                  ),
+                );
               },
-            ),
-            FlatButton(
-              color: Colors.green,
-              onPressed: () {
-                selectFile();
-              },
-              child: Text('Select File'),
-            ),
-            Text(fileName),
-            SizedBox(
-              height: 20.0,
-            ),
-            FlatButton(
-              color: Colors.green,
-              onPressed: () {
-                uploadFile();
-              },
-              child: Text('Upload File'),
-            ),
-            task != null ? buildUploadStatus(task) : Container(),
-          ],
-        ),
+            );
+          } else {
+            return Container();
+          }
+        },
       ),
     );
   }
 
-  Future selectFile() async {
+  Future selectFile(context) async {
     final result = await FilePicker.platform.pickFiles(allowMultiple: false);
     if (result == null) return;
     final path = result.files.single.path;
     setState(() {
       file = File(path);
     });
+    CoolAlert.show(
+        context: context,
+        type: CoolAlertType.confirm,
+        text: "Are you sure you want to upload ${basename(file.path)}?",
+        confirmBtnText: 'Upload',
+        cancelBtnText: 'No',
+        onConfirmBtnTap: () {
+          uploadFile();
+          Navigator.pop(context);
+        },
+        onCancelBtnTap: () {
+          Navigator.pop(context);
+        });
   }
 
   Future uploadFile() async {
@@ -170,22 +210,25 @@ class _HomePageState extends State<HomePage> {
     if (task == null) return;
 
     final snapshots = await task.whenComplete(() {});
+
     final urlDownload = await snapshots.ref.getDownloadURL();
+    final name = snapshots.ref;
     //final delete = await snapshots.ref.delete();
     // print('download url is $urlDownload');
     var url = {
       'downloadUrl': urlDownload,
       'fileName': fileName,
+      'reference': name.toString(),
     };
     _firebaseApi.uploadUrlToFireBase(url);
   }
 
-  Future<void> _delete(String url) async {
+  Future _delete(String url) async {
     // await FirebaseStorage.instance.
-    Reference photoRef = await FirebaseStorage.instance.refFromURL(url);
+    Reference photoRef = FirebaseStorage.instance.ref('files/').child(url);
     await photoRef.delete();
 
-    await photoRef.delete();
+    // await photoRef.delete();
     // Rebuild the UI
     setState(() {});
   }
@@ -203,39 +246,4 @@ class _HomePageState extends State<HomePage> {
           }
         },
       );
-
-  // Future<void> downloadFile(StorageReference ref) async {
-  //   final String url = await ref.getDownloadURL();
-  //   final http.Response downloadData = await http.get(url);
-  //   final Directory systemTempDir = Directory.systemTemp;
-  //   final File tempFile = File('${systemTempDir.path}/tmp.jpg');
-  //   if (tempFile.existsSync()) {
-  //     await tempFile.delete();
-  //   }
-  //   await tempFile.create();
-  //   final StorageFileDownloadTask task = ref.writeToFile(tempFile);
-  //   final int byteCount = (await task.future).totalByteCount;
-  //   var bodyBytes = downloadData.bodyBytes;
-  //   final String name = await ref.getName();
-  //   final String path = await ref.getPath();
-  //   print(
-  //     'Success!\nDownloaded $name \nUrl: $url'
-  //         '\npath: $path \nBytes Count :: $byteCount',
-  //   );
-  //   _scaffoldKey.currentState.showSnackBar(
-  //     SnackBar(
-  //       backgroundColor: Colors.white,
-  //       content: Image.memory(
-  //         bodyBytes,
-  //         fit: BoxFit.fill,
-  //       ),
-  //     ),
-  //   );
-  // }
-  static Future downloadFiles(var ref) async {
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/${ref.name}');
-
-    await ref.writeToFile(file);
-  }
 }

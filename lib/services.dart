@@ -23,7 +23,7 @@ class FirebaseApi {
   }
 
   getFirebaseUrl() async {
-    return await FirebaseFirestore.instance.collection('Url Links').snapshots();
+    return  FirebaseFirestore.instance.collection('Url Links').snapshots();
   }
 
   delete(var index) async {
